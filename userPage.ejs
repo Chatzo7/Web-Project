@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+        crossorigin="anonymous"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+    <title>User</title>
+</head>
+
+<body>
+    <div style="height: 500px;" id="map"></div>
+    <br />
+    <div class="input-group mb-3">
+        <span class="input-group-text">📍</span>
+        <input type="text" class="form-control" id="input_terms">
+        <button onclick="search()" type="button" class="btn btn-primary">Αναζήτηση</button>
+    </div>
+    <span style="text-align:center">
+        <h1>Δηλώστε Θετικό Κρούσμα</h1>
+        <div>
+            <input id="date-input" type="date" />
+            <button onclick="submitCovid()" class="btn btn-primary btn-sm">Δήλωση</button>
+        </div>
+    </span>
+
+    <div style="display:flex; justify-content: flex-start;">
+        <button onclick="go_to_edit_profile()" class="btn btn-primary"> Επεξεργασία Προφίλ </button>
+    </div>
+
+    <div style="display:flex; justify-content: flex-start;">
+        <h4>Έχετε Επισκτεφτεί:</h4>
+        <ul id="list"></ul>
+    </div>
+    <br>
+    <div style="display:flex; justify-content: flex-start;">
+
+        <h4>Δηλώσεις Κρουσμάτων:</h4>
+        <ul id="list_covid"></ul>
+    </div>
+</body>
+
+<script>
+    function go_to_edit_profile() {
+        window.location = '/editprofile'
+    }
+</script>
+
+<script>
+
+    async function haveIVisitedInfectedPlace() {
+        const response = await fetch('/haveIVisitedInfectedPlace', {
+            method: 'GET',
+        })
+
+        const data = await response.json();
+
+        if(data.length > 0){
+            alert(`Εχετε ερθει σε επαφή με κρούσμα στα σημεία και ώρα: ${data.map(x=> ` \nΣημείο ${x.name} ώρα ${x.timestamp} \n`)}`)
+        }
+    }
+    haveIVisitedInfectedPlace()
+</script>
+
+<script>
+    async function submitCovid() {
+        const date = document.getElementById('date-input').value;
+        console.log(date);
+        const response = await fetch('/submitCovid', {
+            method: 'POST',
+            body: JSON.stringify({ date: date }),
+            headers: { 'Content-Type': 'application/json' }
+        })
+
+        if (response.status == 200) {
+            alert('Έχετε Δηλώθεί ως ενεργό κρούσμα')
+        } else if (response.status == 201) {
+            alert('Δεν εχουν περάσει 14 μέρες')
+        }
+    }
+</script>
+
+
+<script>
+    var map = L.map('map').setView([38.246639, 21.734573], 13);
+    L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+        attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+        maxZoom: 18,
+        id: 'mapbox/streets-v11',
+        tileSize: 512,
+        zoomOffset: -1,
+        accessToken: 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw'
+    }).addTo(map);
+
+    // https://stackoverflow.com/a/67246644/7727586
+    let getLocation = () => new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject));
+
+
+    async function work() {
+        const myLocation = await getLocation()
+        const lat = myLocation.coords.latitude
+        const lng = myLocation.coords.longitude
+        map.flyTo([lat, lng], 13);
+        var marker = L.marker([lat, lng]).addTo(map);
+    }
+
+    work();
+</script>
+
+<script>
+
+    greenIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    redIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    orangeIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+</script>
+
+<script>
+    async function search() {
+        const terms = document.getElementById('input_terms').value;
+
+        const resp = await fetch(`/bring_data?param=${terms}`, {});
+        const data = await resp.json();
+        console.log(data);
+        data.map(point => {
+            let todayhour = new Date();
+            todayhour = todayhour.getHours()
+            const hourPopularity = point.popularity.value[todayhour]
+            let marker;
+            if (hourPopularity < 32) {
+                marker = L.marker([point.coordinates.x, point.coordinates.y],
+                    { icon: greenIcon });
+            } else if (hourPopularity < 64) {
+                marker = L.marker([point.coordinates.x, point.coordinates.y],
+                    { icon: orangeIcon });
+            } else {
+                marker = L.marker([point.coordinates.x, point.coordinates.y],
+                    { icon: redIcon });
+            }
+            const html = `
+            <b> ${point.name} </b>
+            <br>
+            <span> Δημοσιότητα τώρα ${point.popularity.value[new Date().getHours()]} </span>
+            <br>
+            <span> Δημοσιότητα σε μία ώρα ${point.popularity.value[new Date().getHours() + 1]} </span>
+            <br>
+            <label> Εκτίμηση Πλύθους </label>
+            <br>
+            <input type="number" id="${point.pointId}_input" placeholder="πλύθος ατόμων"/>
+            <br>
+            <button onclick="iVisitHere(${point.pointId}, document.getElementById('${point.pointId}_input').value)" class="btn btn-primary btn-sm"> Επισκέφτηκα </button>
+            `
+            marker.bindPopup(html)
+            marker.addTo(map)
+            // L.marker([point.coordinates.x, point.coordinates.y]).addTo(map);
+
+        });
+    }
+</script>
+
+
+<script>
+    async function iVisitHere(pointId, numberOfPeople) {
+        console.log('hree', pointId, numberOfPeople);
+
+        const serverResponse = await fetch('/uservisited', {
+            body: JSON.stringify({
+                pointId: pointId,
+                numberOfPeople: numberOfPeople,
+            }),
+            method: "POST",
+            headers: {
+                'content-type': 'application/json'
+            }
+        })
+
+        if (serverResponse.status == 200) {
+            alert('Thank you for choosing us');
+        }
+        else {
+            alert('Something Went Wrong. Trying Loggin in again')
+        }
+    }
+</script>
+
+<script>
+    async function fetchData() {
+        const serverResponse = await fetch('/visite_place');
+        console.log(serverResponse);
+        const data = await serverResponse.json();
+        console.log(data);
+
+        const list = document.getElementById('list')
+        data.data.map(place => {
+            let li = document.createElement("li");
+            li.appendChild(document.createTextNode(place.name));
+            list.appendChild(li);
+        })
+
+
+
+        const list_covid = document.getElementById('list_covid')
+        data.covidArray.map(entry => {
+            let liCov = document.createElement("li");
+            liCov.appendChild(document.createTextNode(entry.isInfected ? `Ενργό, ημ/νια: ${entry.infected_date.split("T")[0]}` : `Μη Ενεργό, ημ/νια: ${entry.infected_date.split("T")[0]}`));
+            list_covid.appendChild(liCov);
+        })
+
+    }
+
+    fetchData()
+
+</script>
+
+</html>
